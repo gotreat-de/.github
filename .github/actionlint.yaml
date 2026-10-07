@@ -1,0 +1,7 @@
+# actionlint 1.7.12 does not know the `job.workflow_*` properties yet, although GitHub documents them
+# (https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context,
+# rhysd/actionlint#707). Drop this file once a release with them is pinned in ci.yml.
+paths:
+  .github/workflows/deploy.yml:
+    ignore:
+      - 'property "workflow_(repository|sha)" is not defined in object type'
