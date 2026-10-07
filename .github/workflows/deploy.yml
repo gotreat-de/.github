@@ -1,0 +1,78 @@
+name: Deploy
+
+# The org's one deploy (https://github.com/gotreat-de/website/blob/main/docs/specs/release-flow.md): store the
+# released compose.yml in Dokploy (compose.update), Dokploy API compose.deploy, wait for the deployment to end,
+# then verify the running version. The only code that talks to Dokploy.
+#
+# Called by each repo's deploy.yml, pinned by full commit SHA. Everything repo-specific is configuration of the
+# *calling* repo: its compose.yml at the repo root, the `production` environment (secret DOKPLOY_API_KEY,
+# variables DOKPLOY_COMPOSE_ID and HEALTH_URL - empty for a service without HTTP) and the variable
+# DOKPLOY_BASE_URL of the calling repository or its org. The caller passes `secrets: inherit` and grants
+# `contents: read`.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Released version that must be running afterwards, without leading v"
+        required: true
+        type: string
+      sha:
+        description: "Released commit, recorded in the Dokploy deployment's description"
+        required: false
+        default: ""
+        type: string
+      dry_run:
+        description: "Only verify Dokploy API access, deploy nothing"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy production via Dokploy API
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # 900 s deployment wait + 180 s health wait, with headroom.
+    timeout-minutes: 25
+    environment: production
+    # On the job, not on the workflow: a caller that declared the same group would wait for itself.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      # Not the caller's code: the deploy script lives next to this file, and `job.workflow_*` names the
+      # commit this workflow was called at - so workflow and script always come from the same ref.
+      - name: Checkout the shared workflows
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+
+      # Dokploy runs the compose it stores, so the deploy hands it the caller's compose.yml of the released commit.
+      # Read through the API as data, never checked out: no code of the calling repo runs beside the API key.
+      - name: Fetch the released compose file
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          gh api --header "Accept: application/vnd.github.raw" \
+            "repos/$REPOSITORY/contents/compose.yml?ref=$RELEASE_SHA" > "$RUNNER_TEMP/compose.yml"
+
+      - name: Deploy and verify
+        env:
+          DOKPLOY_BASE_URL: ${{ vars.DOKPLOY_BASE_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ vars.DOKPLOY_COMPOSE_ID }}
+          HEALTH_URL: ${{ vars.HEALTH_URL }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ inputs.sha || github.sha }}
+          COMPOSE_FILE: ${{ runner.temp }}/compose.yml
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: .github/scripts/deploy-dokploy.sh

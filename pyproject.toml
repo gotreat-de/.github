@@ -1,0 +1,37 @@
+[project]
+name = "gotreat-workflows"
+# Not the release version: releases are the git tags (`just release`), nothing is published from here.
+version = "0.0.0"
+description = "Shared GitHub Actions workflows of the gotreat-de org."
+authors = [{ name = "Leon Weimann", email = "coding@leonweimann.de" }]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/gotreat-de/.github"
+Issues     = "https://github.com/gotreat-de/.github/issues"
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.7"]
+
+# Nothing is built or installed from this repo: Python only runs the tests.
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+preview     = true
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP"]
+
+fixable = ["ALL"]
+
+unfixable = [
+    "F401", # unused imports
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-q -rs"
