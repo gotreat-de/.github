@@ -6,9 +6,12 @@ name: Deploy
 #
 # Called by each repo's deploy.yml, pinned by full commit SHA. Everything repo-specific is configuration of the
 # *calling* repo: its compose.yml at the repo root, the `production` environment (secret DOKPLOY_API_KEY,
-# variables DOKPLOY_COMPOSE_ID and HEALTH_URL - empty for a service without HTTP) and the variable
-# DOKPLOY_BASE_URL of the calling repository or its org. The caller passes `secrets: inherit` and grants
-# `contents: read`.
+# variables DOKPLOY_COMPOSE_ID and HEALTH_URL - empty for a service without HTTP), the variables
+# DOKPLOY_BASE_URL and TS_OAUTH_CLIENT_ID and the secret TS_OAUTH_SECRET of the calling repository or its org.
+# The caller passes `secrets: inherit` and grants `contents: read`.
+#
+# Dokploy's API is only reachable inside the tailnet (tailscale serve on the server), so the job joins it as an
+# ephemeral node tagged tag:ci; the tailnet policy limits tag:ci to the Dokploy host on port 443.
 
 on:
   workflow_call:
@@ -53,6 +56,16 @@ jobs:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           persist-credentials: false
+
+      # Dokploy's API answers only inside the tailnet. The OAuth client may only mint keys for tag:ci, and the
+      # tailnet policy lets tag:ci reach nothing but the Dokploy host on 443. The node is ephemeral and
+      # disappears after the job.
+      - name: Join the tailnet
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ vars.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
       # Dokploy runs the compose it stores, so the deploy hands it the caller's compose.yml of the released commit.
       # Read through the API as data, never checked out: no code of the calling repo runs beside the API key.

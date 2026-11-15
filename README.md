@@ -71,6 +71,8 @@ Configuration, all of it in the **calling** repo:
 | Where | Name | Value |
 |---|---|---|
 | Repo root | `compose.yml` | the service's compose; at least one `image:` carries the release tag `vX.Y.Z` (release-please's annotated `image:` lines). Every deploy stores it in Dokploy as raw source, so an edit in Dokploy's UI lasts only until the next deploy |
+| Variable of the repository or its org | `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client the job joins the tailnet with (scope Auth Keys: write, tag `tag:ci`); Dokploy's API is reachable only inside the tailnet |
+| Secret of the repository or its org | `TS_OAUTH_SECRET` | its secret |
 | Variable of the repository or its org | `DOKPLOY_BASE_URL` | the Dokploy instance, HTTPS |
 | Environment `production`, secret | `DOKPLOY_API_KEY` | API key of the deploying Dokploy user |
 | Environment `production`, variable | `DOKPLOY_COMPOSE_ID` | id of the compose service |
